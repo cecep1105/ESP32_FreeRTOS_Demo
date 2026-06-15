@@ -12,14 +12,18 @@
 #include <RemoteXY.h>
 #include <time.h>
 #include <stdarg.h>
+#include <ctype.h>
+#include <string.h>
+#include <ArduinoJson.h>
+#include <WebSocketsClient.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
 // RemoteXY connection settings
-#define REMOTEXY_WIFI_SSID     "HIBAWIFI"
-#define REMOTEXY_WIFI_PASSWORD "ab43215cde"
+#define REMOTEXY_WIFI_SSID     "FH24G"
+#define REMOTEXY_WIFI_PASSWORD "ANNISA081514"
 #define REMOTEXY_SERVER_PORT   6377
 
 // Time zone. Jakarta = UTC+7, no DST.
@@ -36,6 +40,20 @@
 #define PI_RX_PIN  18
 #define PI_TX_PIN  17
 #define PI_BAUD    115200
+
+// ---- WebSocket client: backend notifications -> Pi marquee -----------------
+// The ESP32 connects as a WS client to your existing Python backend. The
+// backend receives MikroTik RouterOS netwatch events and pushes them to its
+// connected clients; each text frame here becomes a scrolling message on the
+// Pi via the existing "msg" command. Plain ws:// by default; flip WS_USE_SSL
+// to 1 for wss:// (TLS).
+
+#define WS_HOST      "172.16.10.36" //your backend server IP / hostname
+#define WS_PORT      4001          // <-- your WS server port
+#define WS_PATH      "/ws/netmon/?timeid=1234567890"    // your WS endpoint path
+#define WS_USE_SSL   0                 // 1 = wss:// (TLS), 0 = ws:// (plain)
+#define WS_HELLO     "RPI"              // optional line sent on connect (subscribe/auth); "" = none
+#define MARQUEE_MAX  100               // clamp forwarded text to the Pi "msg" limit
 
 // RemoteXY GUI configuration
 #pragma pack(push, 1)  
@@ -234,15 +252,33 @@ void remotexyTask(void *pv) {
     // --- custom message button (fires once per press) ---
     static uint8_t lastSendBtn = 0;
     if (RemoteXY.buttonMsg && !lastSendBtn) {
-        char buf[201];
+        char buf[101];
         strncpy(buf, RemoteXY.msgText, sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';                 // hard 200-char clamp + null
+        buf[sizeof(buf) - 1] = '\0';                 // hard 100-char clamp + null
         for (char *p = buf; *p; ++p)                 // strip stray CR/LF from keyboard
             if (*p == '\r' || *p == '\n') *p = ' ';
         if (buf[0]) {
-            for (int i = 0; i < sizeof(buf) && buf[i] != '\0'; i++) buf[i] = toupper(buf[i]);
-            piCmd("msg %s", buf);              // text as ARGUMENT, not as format
-            Serial.printf("[TX] %s\n", buf);
+            // Detect a qr-family control command at the start of the message:
+            //   "qr ...", "QR:...", "qrfull ...", "qrsmall ..."  (case-insensitive)
+            // Forward those to the Pi verbatim; everything else is a marquee msg.
+            // Examples:  "QR:https://site" -> "qr https://site"
+            //            "qrsmall HELLO"   -> "qrsmall HELLO"
+            //            "qrfull off"      -> "qrfull off"
+            char cmd[10] = {0}; int ci = 0;
+            while (buf[ci] && buf[ci] != ' ' && buf[ci] != ':' && ci < 9) {
+                cmd[ci] = (char)tolower((unsigned char)buf[ci]); ci++;
+            }
+            const char *rest = buf[ci] ? buf + ci + 1 : buf + ci;   // skip the separator
+            if (!strcmp(cmd,"qr") || !strcmp(cmd,"qrfull") || !strcmp(cmd,"qrsmall")) {
+                char qcmd[120];
+                snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
+                piSendRaw(qcmd);
+                Serial.printf("[TX-QR] %s\n", qcmd);
+            } else {
+                for (int i = 0; i < sizeof(buf) && buf[i] != '\0'; i++) buf[i] = toupper(buf[i]);
+                piCmd("msg %s", buf);              // text as ARGUMENT, not as format
+                Serial.printf("[TX] %s\n", buf);
+            }
         }
     }
     lastSendBtn = RemoteXY.buttonMsg;
@@ -309,6 +345,95 @@ void networkTask(void *pv) {
 }
 
 
+/* ============================ TASK 3: WebSocket =========================
+ * WS client to the backend. On each text frame, forward the notification to
+ * the Pi as a scrolling marquee. Reconnects automatically if the link drops.
+ * ==========================================================================*/
+WebSocketsClient webSocket;
+
+// Forward a notification to the Pi as a scrolling marquee. Strips CR/LF and
+// other control chars (the Pi link is line-based) and clamps the length.
+static void forwardMarquee(const char *text) {
+    char buf[MARQUEE_MAX + 1];
+    int n = 0;
+    for (const char *s = text; *s && n < MARQUEE_MAX; ++s) {
+        char c = *s;
+        if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+        if ((unsigned char)c < 0x20) continue;     // drop other control chars
+        buf[n++] = c;
+    }
+    buf[n] = '\0';
+    if (n == 0) return;
+    piCmd("msg %s", buf);                          // -> Pi marquee
+    Serial.printf("[WS->PI] msg %s\n", buf);
+}
+
+// Turn an incoming WS text frame into a marquee string. Accepts either plain
+// text (forwarded as-is) or a JSON object. For JSON it uses an explicit
+// message/msg/text field if present; otherwise it composes a netwatch-style
+// line from name/host/address + status/state + comment.
+static void handleWsText(uint8_t *payload, size_t length) {
+    static char in[512];
+    size_t m = (length < sizeof(in) - 1) ? length : sizeof(in) - 1;
+    memcpy(in, payload, m); in[m] = '\0';
+
+    if (in[0] != '{') { forwardMarquee(in); return; }      // not JSON -> raw
+
+    JsonDocument doc;
+    if (deserializeJson(doc, in)) { forwardMarquee(in); return; }  // bad JSON -> raw
+
+    const char *msg = doc["message"] | (const char *)nullptr;
+    if (!(msg && *msg)) msg = doc["msg"]  | (const char *)nullptr;
+    if (!(msg && *msg)) msg = doc["text"] | (const char *)nullptr;
+    if (msg && *msg) { forwardMarquee(msg); return; }
+
+    const char *host    = doc["host"]    | "";
+    const char *addr    = doc["address"] | "";
+    const char *name    = doc["name"]    | "";
+    const char *status  = doc["status"]  | "";
+    const char *state   = doc["state"]   | "";
+    const char *comment = doc["comment"] | "";
+    const char *who = name[0] ? name : (host[0] ? host : addr);
+    const char *st  = status[0] ? status : state;
+
+    char line[MARQUEE_MAX + 1];
+    snprintf(line, sizeof line, "NETWATCH %s %s %s", who, st, comment);
+    forwardMarquee(line);
+}
+
+static void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
+    switch (type) {
+        case WStype_CONNECTED:
+            Serial.printf("[WS] connected %s:%d%s\n", WS_HOST, WS_PORT, WS_PATH);
+            if (sizeof(WS_HELLO) > 1) webSocket.sendTXT(WS_HELLO);   // optional subscribe/auth
+            break;
+        case WStype_DISCONNECTED:
+            Serial.println("[WS] disconnected");
+            break;
+        case WStype_TEXT:
+            handleWsText(payload, length);
+            break;
+        default:
+            break;   // BIN / PING / PONG / ERROR are handled by the library
+    }
+}
+
+void websocketTask(void *pv) {
+    while (WiFi.status() != WL_CONNECTED) vTaskDelay(pdMS_TO_TICKS(200));  // wait for RemoteXY's WiFi
+#if WS_USE_SSL
+    webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+#else
+    webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
+#endif
+    webSocket.onEvent(webSocketEvent);
+    webSocket.setReconnectInterval(5000);           // retry every 5 s if dropped
+    webSocket.enableHeartbeat(15000, 3000, 2);      // ping 15 s, 3 s pong timeout, drop after 2 misses
+    for (;;) {
+        webSocket.loop();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
 void setup() {
     Serial.begin(115200);                          // USB debug console
     Serial1.begin(PI_BAUD, SERIAL_8N1, PI_RX_PIN, PI_TX_PIN);
@@ -321,6 +446,7 @@ void setup() {
     serialMutex = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(remotexyTask, "remotexy", 8192, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(networkTask,  "network",  8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(websocketTask,"websocket",8192, NULL, 1, NULL, 0);
 }
 
 void loop() {
