@@ -6,9 +6,12 @@
 
 //#define REMOTEXY__DEBUGLOG
 
-#define REMOTEXY_MODE__WIFI
+#define REMOTEXY_MODE__ESP32CORE_BLE        // RemoteXY over Bluetooth LE (frees WiFi for WiFiManager)
+#define REMOTEXY_BLUETOOTH_NAME "LogicLA"   // name shown in the RemoteXY app's BLE device list
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiManager.h>                     // tzapu/WiFiManager: pick a hotspot at runtime
+#include <BLEDevice.h>                        // required by RemoteXY ESP32 BLE mode
 #include <RemoteXY.h>
 #include <time.h>
 #include <stdarg.h>
@@ -21,10 +24,26 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
+// ---- Logic-analyzer feature (BitScope BS05U -> HDMI) -----------------------
+#include "bvm.h"          // protocol helpers (pack + wire framing)
+#include "bs05_logic.h"   // BS_* tunables (+ real capture, added later)
+#include "la_sim.h"       // synthetic source: prove HDMI path without the BS05U
+
+#include "esp_usb_vcp.h"
+static EspUsbVcp vcp;
+
+
+
+
+
+
+
 // RemoteXY connection settings
-#define REMOTEXY_WIFI_SSID     "FH24G"
-#define REMOTEXY_WIFI_PASSWORD "ANNISA081514"
-#define REMOTEXY_SERVER_PORT   6377
+// RemoteXY connection settings — UNUSED in BLE mode (kept for reference only).
+// WiFi is now provisioned by WiFiManager, not RemoteXY.
+//#define REMOTEXY_WIFI_SSID     "wifissid"
+//#define REMOTEXY_WIFI_PASSWORD "wifipassword"
+//#define REMOTEXY_SERVER_PORT   6377
 
 // Time zone. Jakarta = UTC+7, no DST.
 #define TZ_OFFSET_SEC   (7 * 3600)
@@ -57,8 +76,8 @@
 
 // RemoteXY GUI configuration
 #pragma pack(push, 1)  
-uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 500 bytes V19 
-  { 255,223,0,0,0,237,1,19,0,0,0,0,31,1,106,200,2,1,0,25,
+uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 539 bytes V19 
+  { 255,224,0,0,0,20,2,19,0,0,0,0,31,1,106,200,2,1,0,25,
   0,130,3,3,100,36,11,107,130,4,43,98,51,11,107,130,59,99,41,64,
   11,107,130,5,100,37,62,11,105,2,7,9,24,22,0,2,26,31,31,79,
   78,0,79,70,70,0,2,10,47,16,16,1,2,26,31,31,79,78,0,79,
@@ -76,13 +95,15 @@ uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 500 bytes V19
   1,83,69,82,86,79,0,129,62,153,30,7,64,1,83,84,69,80,80,69,
   82,0,129,36,31,37,7,64,1,76,69,68,32,83,87,69,69,80,0,129,
   21,85,70,7,64,1,77,65,78,85,65,76,32,76,69,68,32,79,78,92,
-  47,79,70,70,0,131,37,174,26,14,3,17,2,31,62,62,0,6,10,0,
+  47,79,70,70,0,131,37,174,26,14,3,17,2,31,62,62,0,6,12,0,
   130,3,90,100,49,11,17,130,3,8,100,78,11,17,7,7,38,93,12,100,
   0,2,26,2,201,1,41,59,24,24,0,2,31,0,7,6,101,34,10,118,
   64,2,26,2,7,45,101,34,10,118,64,2,26,2,1,83,98,17,17,0,
   2,31,0,129,18,15,75,12,64,6,77,101,115,115,97,103,101,32,84,101,
   120,116,0,129,24,124,62,8,64,6,77,97,110,117,97,108,32,67,108,111,
-  99,107,32,83,101,116,0,131,41,169,26,14,3,17,2,31,60,60,0,9 };
+  99,107,32,83,101,116,0,131,40,178,26,14,3,17,2,31,60,60,0,9,
+  2,31,147,37,13,0,2,26,31,31,79,78,0,79,70,70,0,129,24,162,
+  53,8,64,8,76,111,103,105,99,32,65,110,97,108,121,122,101,114,0 };
   
 // this structure defines all the variables and events of your control interface 
 struct {
@@ -109,6 +130,7 @@ struct {
   int16_t hourval; // -32768 .. +32767
   int16_t minval; // -32768 .. +32767
   uint8_t settime; // =1 if button pressed, else =0, from 0 to 1
+  uint8_t switchLA; // =1 if switch ON and =0 if OFF, from 0 to 1
 
     // other variable
   uint8_t connect_flag;  // =1 if wire connected, else =0
@@ -119,6 +141,11 @@ struct {
 /////////////////////////////////////////////
 //           END RemoteXY include          //
 /////////////////////////////////////////////
+
+void RemoteXY_msgText_event() {
+  // TODO: RemoteXY.msgText was changed
+}
+
 
 // Guards the single UART1 link to the Pi (shared by both tasks).
 static SemaphoreHandle_t serialMutex;
@@ -147,6 +174,32 @@ void piSendRaw(const char *s) {
         Serial1.print(s);
         Serial1.print("\r\n");
         xSemaphoreGive(serialMutex);
+    }
+}
+
+// ---- Logic-analyzer streaming source ---------------------------------------
+// Streams 8-channel logic frames to the Pi using the same "la begin/d/end"
+// line protocol the HDMI logic view consumes. Right now the source is the
+// synthetic generator (la_sim_fill) so the whole path can be proven from
+// RemoteXY with no BS05U attached. When the cable arrives, replace the
+// la_sim_fill() call with bs05_capture() (esp-usb backend) and keep the rest.
+// Trigger: Message Text box -> "la" starts, "la off" stops.
+static volatile bool g_laRun = false;
+static volatile bool g_wifiReconfig = false;   // set by "wifi" cmd -> reopen WiFiManager portal
+static void laEmit(const char *line, void *ctx) { (void)ctx; piSendRaw(line); }
+
+static void laSimTask(void *pv) {
+    (void)pv;
+    static uint8_t samples[BS_NSAMPLES];
+    static uint8_t col[256];
+    uint32_t frame = 0;
+    const TickType_t period = pdMS_TO_TICKS(1000 / (BS_FPS < 1 ? 1 : BS_FPS));
+    for (;;) {
+        if (!g_laRun) { vTaskDelay(pdMS_TO_TICKS(80)); continue; }
+        la_sim_fill(samples, BS_NSAMPLES, frame++);
+        int nc = bvm_pack_columns(samples, BS_NSAMPLES, col, BS_NCOLS);
+        bvm_emit_frame(col, nc, 8, BS_RATE_HZ, laEmit, nullptr);
+        vTaskDelay(period);
     }
 }
 
@@ -274,6 +327,14 @@ void remotexyTask(void *pv) {
                 snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
                 piSendRaw(qcmd);
                 Serial.printf("[TX-QR] %s\n", qcmd);
+            } else if (!strcmp(cmd,"la")) {
+                // logic-analyzer view: "la" starts the live stream, "la off" stops
+                if (!strncmp(rest,"off",3)) { g_laRun = false; piSendRaw("la off"); Serial.println("[LA] off"); }
+                else                        { g_laRun = true;                       Serial.println("[LA] on"); }
+            } else if (!strcmp(cmd,"wifi")) {
+                // reopen the WiFiManager portal so you can pick a new hotspot
+                g_wifiReconfig = true;
+                Serial.println("[WIFI] reconfigure requested");
             } else {
                 for (int i = 0; i < sizeof(buf) && buf[i] != '\0'; i++) buf[i] = toupper(buf[i]);
                 piCmd("msg %s", buf);              // text as ARGUMENT, not as format
@@ -322,6 +383,13 @@ void networkTask(void *pv) {
     piCmd("machine on");   // re-assert quiet mode once tasks are live
 
     for (;;) {
+        if (g_wifiReconfig) {                       // user asked to switch hotspot
+            g_wifiReconfig = false;
+            WiFiManager wm;
+            wm.setConfigPortalTimeout(180);
+            wm.startConfigPortal("LogicLA-Setup");  // blocks THIS task until done/timeout
+            ntpStarted = false;                      // re-sync time on the new network
+        }
         if (WiFi.status() == WL_CONNECTED) {
             if (!ntpStarted) {
                 configTime(TZ_OFFSET_SEC, DST_OFFSET_SEC, "pool.ntp.org", "time.nist.gov");
@@ -419,7 +487,7 @@ static void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
 }
 
 void websocketTask(void *pv) {
-    while (WiFi.status() != WL_CONNECTED) vTaskDelay(pdMS_TO_TICKS(200));  // wait for RemoteXY's WiFi
+    while (WiFi.status() != WL_CONNECTED) vTaskDelay(pdMS_TO_TICKS(200));  // wait for WiFiManager's link
 #if WS_USE_SSL
     webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
 #else
@@ -435,18 +503,46 @@ void websocketTask(void *pv) {
 }
 
 void setup() {
+    #include <esp_log.h>
+    // ...
+    esp_log_level_set("*", ESP_LOG_DEBUG);   // surface USB HOST / cdc_acm / FT23x / VCP logs
+
+
+
+
+
+
+
     Serial.begin(115200);                          // USB debug console
     Serial1.begin(PI_BAUD, SERIAL_8N1, PI_RX_PIN, PI_TX_PIN);
+
+    bs05_begin(&vcp);                 // starts USB host (manages hot-plug)
+    xTaskCreatePinnedToCore(bs05_task, "bs05", 4096, (void*)piSendRaw, 1, NULL, 1);
+
+
     delay(200);
     Serial1.print("machine on\r\n");               // quiet the Pi link early
     Serial.println("\nStarting...");
 
-    RemoteXY_Init();                               // RemoteXY manages the WiFi link
+    // ---- WiFi: WiFiManager owns provisioning + roaming (independent of RemoteXY/BLE) ----
+    WiFi.mode(WIFI_STA);
+    {
+        WiFiManager wm;
+        wm.setConfigPortalTimeout(180);            // 3-min captive portal, then give up
+        // Connects using saved creds; if none (or you moved the board and they
+        // fail), opens AP "LogicLA-Setup" where you scan + pick a hotspot. The
+        // choice is saved to flash (NVS) and auto-used on the next boot.
+        if (!wm.autoConnect("LogicLA-Setup"))
+            Serial.println("WiFi not provisioned; continuing (BLE control still works)");
+    }
+
+    RemoteXY_Init();                               // RemoteXY over BLE; does not touch WiFi
 
     serialMutex = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(remotexyTask, "remotexy", 8192, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(networkTask,  "network",  8192, NULL, 1, NULL, 0);
     xTaskCreatePinnedToCore(websocketTask,"websocket",8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(laSimTask,    "la_sim",   4096, NULL, 1, NULL, 1);
 }
 
 void loop() {
