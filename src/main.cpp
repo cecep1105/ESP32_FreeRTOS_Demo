@@ -335,6 +335,7 @@ void remotexyTask(void *pv) {
                 } else {                               // "la"      -> real BS05U capture
                     g_laRun = false; bs05_start(); Serial.println("[LA] capture on");
                 }
+                
             } else if (!strcmp(cmd,"wifi")) {
                 // reopen the WiFiManager portal so you can pick a new hotspot
                 g_wifiReconfig = true;
