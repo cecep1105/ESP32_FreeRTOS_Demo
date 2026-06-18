@@ -327,10 +327,14 @@ void remotexyTask(void *pv) {
                 snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
                 piSendRaw(qcmd);
                 Serial.printf("[TX-QR] %s\n", qcmd);
-            } else if (!strcmp(cmd,"la")) {
-                // logic-analyzer view: "la" starts the live stream, "la off" stops
-                if (!strncmp(rest,"off",3)) { g_laRun = false; piSendRaw("la off"); Serial.println("[LA] off"); }
-                else                        { g_laRun = true;                       Serial.println("[LA] on"); }
+} else if (!strcmp(cmd,"la")) {
+                if (!strncmp(rest,"sim",3)) {          // "la sim"  -> synthetic pattern (no device)
+                    bs05_stop(); g_laRun = true;  Serial.println("[LA] sim on");
+                } else if (!strncmp(rest,"off",3)) {   // "la off"  -> stop both
+                    g_laRun = false; bs05_stop(); piSendRaw("la off"); Serial.println("[LA] off");
+                } else {                               // "la"      -> real BS05U capture
+                    g_laRun = false; bs05_start(); Serial.println("[LA] capture on");
+                }
             } else if (!strcmp(cmd,"wifi")) {
                 // reopen the WiFiManager portal so you can pick a new hotspot
                 g_wifiReconfig = true;
