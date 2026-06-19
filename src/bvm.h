@@ -28,7 +28,8 @@ enum {
     R_Timeout      = 0x2c, R_Prelude     = 0x3a, R_BufferMode   = 0x31,
     R_DumpMode     = 0x1e, R_DumpChan    = 0x30, R_DumpSend     = 0x18,
     R_DumpSkip     = 0x1a, R_DumpCount   = 0x1c, R_DumpRepeat   = 0x16,
-    R_AnalogEnable = 0x37, R_DigitalEnable= 0x38
+    R_AnalogEnable = 0x37, R_DigitalEnable= 0x38,
+    R_Cmd          = 0x46, R_Mode         = 0x47, R_Map5 = 0x99
 };
 enum { TRACE_LOGIC = 14, BUFMODE_SINGLE = 0, DUMP_RAW = 0 };
 enum { TS_DONE = 0, TS_AUTO = 1, TS_WAIT = 2, TS_STOP = 3 };
@@ -65,6 +66,11 @@ size_t bvm_logic_setup_cmd(const bvm_logic_cfg_t *c, uint8_t digital_enable,
  * read back from the device after the trace completes. */
 size_t bvm_logic_dump_cmd(const bvm_logic_cfg_t *c, uint32_t write_addr,
                           char *out, size_t outsz);
+
+/* Emit the register block that unmaps the internal clock from logic channel 5
+ * (Map5=0) and stops the clock generator. Issue 'Z' after this. Without it,
+ * a running clock generator drives L5 instead of the external probe. */
+size_t bvm_stop_clock_cmd(char *out, size_t outsz);
 
 /* ---- ESP32 -> Pi wire framing (the frozen contract) ------------------ */
 /* Decimate 'nsamp' raw logic bytes down to 'ncols' columns (max 256) by

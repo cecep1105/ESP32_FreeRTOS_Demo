@@ -134,3 +134,14 @@ void bvm_emit_frame(const uint8_t *col, int ncols, int nch, uint32_t rate,
     /* end */
     { const char *s="la end"; char *p=line; while(*s)*p++=*s++; *p=0; emit(line,ctx); }
 }
+
+/* Unmap the internal clock from L5 and stop the clock generator (scopething
+ * stop_clock: set_registers(Map5=0, Cmd=1, Mode=0) then issue 'Z'). */
+size_t bvm_stop_clock_cmd(char *out, size_t outsz){
+    const bvm_reg_t regs[] = {
+        { R_Map5, 1, 0 },   /* peripheral-pin-select ch5 = none -> L5 is logic */
+        { R_Cmd,  1, 1 },   /* clock-generator command vector = stop           */
+        { R_Mode, 1, 0 },
+    };
+    return bvm_build_set_registers(regs, (int)(sizeof regs/sizeof regs[0]), out, outsz);
+}

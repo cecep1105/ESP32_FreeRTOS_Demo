@@ -76,34 +76,41 @@ static EspUsbVcp vcp;
 
 // RemoteXY GUI configuration
 #pragma pack(push, 1)  
-uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 539 bytes V19 
-  { 255,224,0,0,0,20,2,19,0,0,0,0,31,1,106,200,2,1,0,25,
-  0,130,3,3,100,36,11,107,130,4,43,98,51,11,107,130,59,99,41,64,
-  11,107,130,5,100,37,62,11,105,2,7,9,24,22,0,2,26,31,31,79,
-  78,0,79,70,70,0,2,10,47,16,16,1,2,26,31,31,79,78,0,79,
-  70,70,0,2,34,47,16,16,1,2,26,31,31,79,78,0,79,70,70,0,
-  2,57,47,16,16,1,2,26,31,31,79,78,0,79,70,70,0,2,80,47,
-  16,16,1,2,26,31,31,79,78,0,79,70,70,0,2,10,65,16,16,1,
-  2,26,31,31,79,78,0,79,70,70,0,2,34,65,16,16,1,2,26,31,
-  31,79,78,0,79,70,70,0,2,57,65,16,16,1,2,26,31,31,79,78,
-  0,79,70,70,0,2,80,65,16,16,1,2,26,31,31,79,78,0,79,70,
-  70,0,4,40,13,59,13,128,2,26,2,9,106,26,13,0,2,26,31,31,
-  79,78,0,79,70,70,0,2,66,106,26,13,0,2,26,31,31,79,78,0,
-  79,70,70,0,4,9,123,26,9,128,2,26,4,66,122,26,9,128,2,26,
-  2,10,135,26,13,0,2,26,31,31,79,78,0,79,70,70,0,2,66,135,
-  26,13,0,2,26,31,31,79,78,0,79,70,70,0,129,13,153,22,7,64,
-  1,83,69,82,86,79,0,129,62,153,30,7,64,1,83,84,69,80,80,69,
-  82,0,129,36,31,37,7,64,1,76,69,68,32,83,87,69,69,80,0,129,
-  21,85,70,7,64,1,77,65,78,85,65,76,32,76,69,68,32,79,78,92,
-  47,79,70,70,0,131,37,174,26,14,3,17,2,31,62,62,0,6,12,0,
-  130,3,90,100,49,11,17,130,3,8,100,78,11,17,7,7,38,93,12,100,
-  0,2,26,2,201,1,41,59,24,24,0,2,31,0,7,6,101,34,10,118,
-  64,2,26,2,7,45,101,34,10,118,64,2,26,2,1,83,98,17,17,0,
-  2,31,0,129,18,15,75,12,64,6,77,101,115,115,97,103,101,32,84,101,
-  120,116,0,129,24,124,62,8,64,6,77,97,110,117,97,108,32,67,108,111,
-  99,107,32,83,101,116,0,131,40,178,26,14,3,17,2,31,60,60,0,9,
-  2,31,147,37,13,0,2,26,31,31,79,78,0,79,70,70,0,129,24,162,
-  53,8,64,8,76,111,103,105,99,32,65,110,97,108,121,122,101,114,0 };
+uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 677 bytes V19 
+  { 255,227,0,0,0,158,2,19,0,0,0,0,31,1,106,200,3,1,0,0,
+  19,0,130,4,139,98,36,13,163,130,3,3,100,53,11,107,130,3,62,100,
+  71,11,107,2,31,19,53,16,0,2,26,31,31,82,85,78,0,83,84,79,
+  80,0,2,12,85,16,16,1,2,26,31,31,49,0,79,70,70,0,2,36,
+  85,16,16,1,2,26,31,31,50,0,79,70,70,0,2,59,85,16,16,1,
+  2,26,31,31,51,0,79,70,70,0,2,82,85,16,16,1,2,26,31,31,
+  52,0,79,70,70,0,2,12,103,16,16,1,2,26,31,31,53,0,79,70,
+  70,0,2,36,103,16,16,1,2,26,31,31,54,0,79,70,70,0,2,59,
+  103,16,16,1,2,26,31,31,55,0,79,70,70,0,2,82,103,16,16,1,
+  2,26,31,31,56,0,79,70,70,0,4,8,41,93,9,128,2,26,129,27,
+  7,58,11,64,1,76,69,68,32,83,87,69,69,80,0,129,23,71,66,12,
+  64,1,76,69,68,32,79,78,124,79,70,70,0,131,6,182,94,12,1,6,
+  2,31,78,101,120,116,0,6,129,32,145,47,12,64,35,81,82,67,79,68,
+  69,0,2,8,157,42,11,0,2,26,31,31,83,72,79,87,0,72,73,68,
+  69,0,2,60,157,36,10,0,2,26,31,31,66,73,71,0,83,77,65,76,
+  76,0,10,0,130,3,67,100,49,11,17,130,2,8,102,52,11,17,7,7,
+  21,93,12,100,0,2,26,2,201,1,20,41,61,10,1,2,31,83,69,78,
+  68,32,84,69,88,84,0,7,7,82,43,10,118,64,2,26,2,7,57,82,
+  42,10,118,64,2,26,2,1,16,99,74,10,1,2,31,83,69,84,32,84,
+  73,77,69,0,129,21,70,62,8,64,6,77,97,110,117,97,108,32,67,108,
+  111,99,107,32,83,101,116,0,131,3,178,37,12,1,6,2,31,80,82,69,
+  86,0,41,131,66,178,37,12,1,6,2,31,78,69,88,84,0,26,17,0,
+  130,8,7,89,32,11,17,129,23,13,59,9,64,35,76,111,103,105,99,32,
+  65,110,97,108,121,122,101,114,0,2,30,23,43,12,0,2,26,31,31,79,
+  78,0,79,70,70,0,130,8,42,89,29,11,17,129,26,45,52,9,64,35,
+  79,115,99,105,108,108,111,115,99,111,112,101,0,2,30,55,43,12,0,2,
+  26,31,31,79,78,0,79,70,70,0,130,9,80,87,39,11,105,2,15,93,
+  29,13,0,2,26,31,31,79,78,0,79,70,70,0,4,13,108,77,7,128,
+  2,26,2,64,93,26,13,0,2,26,31,31,82,0,76,0,129,28,84,48,
+  7,64,1,83,69,82,86,79,32,77,79,84,79,82,0,130,9,122,87,43,
+  11,107,2,14,134,26,13,0,2,26,31,31,79,78,0,79,70,70,0,4,
+  15,150,78,9,128,2,26,2,64,134,26,12,0,2,26,31,31,82,0,76,
+  0,129,20,125,64,8,64,1,83,84,69,80,80,69,82,32,77,79,84,79,
+  82,0,131,34,180,37,12,1,6,2,31,80,82,69,86,0,38 };
   
 // this structure defines all the variables and events of your control interface 
 struct {
@@ -119,18 +126,21 @@ struct {
   uint8_t led7; // =1 if switch ON and =0 if OFF, from 0 to 1
   uint8_t led8; // =1 if switch ON and =0 if OFF, from 0 to 1
   int8_t slider1; // from 0 to 100
-  uint8_t servoSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
-  uint8_t stepSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
-  int8_t servoSpeed; // from 0 to 100
-  int8_t stepSpeed; // from 0 to 100
-  uint8_t servoDir; // =1 if switch ON and =0 if OFF, from 0 to 1
-  uint8_t stepDir; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t qr_switch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t qrmode; // =1 if switch ON and =0 if OFF, from 0 to 1
   char msgText[201]; // string UTF8 end zero
   uint8_t buttonMsg; // =1 if button pressed, else =0, from 0 to 1
   int16_t hourval; // -32768 .. +32767
   int16_t minval; // -32768 .. +32767
   uint8_t settime; // =1 if button pressed, else =0, from 0 to 1
-  uint8_t switchLA; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t laSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t scSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t servoSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  int8_t servoSpeed; // from 0 to 100
+  uint8_t servoDir; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t stepSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  int8_t stepSpeed; // from 0 to 100
+  uint8_t stepDir; // =1 if switch ON and =0 if OFF, from 0 to 1
 
     // other variable
   uint8_t connect_flag;  // =1 if wire connected, else =0
@@ -264,6 +274,8 @@ void remotexyTask(void *pv) {
     int     lastMs   = -1;
     int     lastMask = -1;
     int     lastMsg  = -1;
+    int     lastLa   = -1;
+    int     lastSc   = -1;
     uint8_t lastSet  = 0;
 #if USE_SERVO_STEPPER_GUI
     uint8_t lsSv = 0xFF, lsSvD = 0xFF, lsSt = 0xFF, lsStD = 0xFF;
@@ -294,6 +306,19 @@ void remotexyTask(void *pv) {
         if (RemoteXY.led8) mask |= (1 << 7);
         if ((int)mask != lastMask) { piCmd("leds %d", mask); lastMask = mask; }
 
+
+        // show logic analyzer on|off
+        uint8_t laSwitch = RemoteXY.laSwitch ? 1 : 0;
+        if (laSwitch != lastLa) { 
+           strcpy(RemoteXY.msgText, laSwitch? "la" : "la off"); 
+           RemoteXY.buttonMsg = 1; // cheat: reuse the message box to trigger the capture on the Pi
+        }
+
+        // show scope on|off
+        uint8_t scSwitch = RemoteXY.scSwitch ? 1 : 0;
+        if (scSwitch != lastSc) { piCmd(scSwitch ? "scope" : "scope off"); lastSc = scSwitch; }
+
+        
         // set clock on the rising edge of the Set-time button
         if (RemoteXY.settime && !lastSet) {
             int hh = RemoteXY.hourval; if (hh < 0) hh = 0; if (hh > 23) hh = 23;
@@ -327,7 +352,7 @@ void remotexyTask(void *pv) {
                 snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
                 piSendRaw(qcmd);
                 Serial.printf("[TX-QR] %s\n", qcmd);
-} else if (!strcmp(cmd,"la")) {
+            } else if (!strcmp(cmd,"la")) {
                 if (!strncmp(rest,"sim",3)) {          // "la sim"  -> synthetic pattern (no device)
                     bs05_stop(); g_laRun = true;  Serial.println("[LA] sim on");
                 } else if (!strncmp(rest,"off",3)) {   // "la off"  -> stop both
@@ -335,7 +360,6 @@ void remotexyTask(void *pv) {
                 } else {                               // "la"      -> real BS05U capture
                     g_laRun = false; bs05_start(); Serial.println("[LA] capture on");
                 }
-                
             } else if (!strcmp(cmd,"wifi")) {
                 // reopen the WiFiManager portal so you can pick a new hotspot
                 g_wifiReconfig = true;
