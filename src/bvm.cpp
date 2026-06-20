@@ -95,6 +95,71 @@ size_t bvm_logic_dump_cmd(const bvm_logic_cfg_t *c, uint32_t write_addr,
     return bvm_build_set_registers(regs, (int)(sizeof regs/sizeof regs[0]), out, outsz);
 }
 
+/* ---- analog (scope) builders ----------------------------------------- */
+void bvm_scope_plan(uint32_t target_rate, uint16_t nsamples, int nch,
+                    bvm_logic_cfg_t *c){
+    bvm_logic_plan(target_rate, nsamples, c);     /* same ticks math          */
+    if(nch==2) c->nsamples &= ~1u;                /* chop needs an even count */
+    c->trace_intro=0;
+    c->trace_outro=(uint16_t)(c->nsamples-1);
+    c->timeout = 400;     /* faster auto fallback (~<1s) if no trigger crossing */
+}
+
+size_t bvm_scope_setup_cmd(const bvm_logic_cfg_t *c, uint8_t analog_mask, int nch,
+                           uint16_t conv_lo, uint16_t conv_hi,
+                           char *out, size_t outsz){
+    /* Arm the hardware comparator so the trace actually triggers. Prefer CHA;
+     * use CHB only when A isn't enabled. Trigger at mid-scale "above": a
+     * periodic signal crosses it every cycle -> TS_DONE; the auto-timeout is
+     * the fallback for flat inputs. (scopething trigger='A'/'B', type='above'.) */
+    bool trigA = (analog_mask & 0x01) != 0;
+    uint8_t spock  = 0x01 | (trigA ? 0x00 : 0x04);   /* HW comparator + source  */
+    uint8_t tlogic = trigA ? 0x80 : 0x40;
+    uint8_t tmask  = (uint8_t)(0xff ^ tlogic);
+    uint8_t ksa    = trigA ? 0x80 : 0x40;            /* comparator enable A/B   */
+    bvm_reg_t regs[] = {
+        { R_TraceMode,    1, (uint32_t)((nch==2)?TRACE_ANALOGCHOP:TRACE_ANALOG) },
+        { R_BufferMode,   1, (uint32_t)((nch==2)?(int)BUFMODE_CHOP:(int)BUFMODE_SINGLE) },
+        { R_SampleAddress,3, 0 },
+        { R_ClockTicks,   2, c->ticks },
+        { R_ClockScale,   2, 1 },
+        { R_TriggerLevel, 2, 0x8000 },     /* mid-scale comparator threshold  */
+        { R_TriggerLogic, 1, tlogic },
+        { R_TriggerMask,  1, tmask },
+        { R_TraceIntro,   2, c->trace_intro },
+        { R_TraceOutro,   2, c->trace_outro },
+        { R_TraceDelay,   4, 0 },
+        { R_Timeout,      2, c->timeout },
+        { R_TriggerIntro, 2, 0 },
+        { R_TriggerOutro, 2, 2 },
+        { R_Prelude,      2, 0 },
+        { R_SpockOption,  1, spock },
+        { R_ConverterLo,  2, conv_lo },    /* U0.16 ADC window (needs tuning) */
+        { R_ConverterHi,  2, conv_hi },
+        { R_KitchenSinkA, 1, ksa },
+        { R_KitchenSinkB, 1, KSB_ANALOG_FILTER },
+        { R_AnalogEnable, 1, analog_mask },
+        { R_DigitalEnable,1, 0 },
+    };
+    return bvm_build_set_registers(regs, (int)(sizeof regs/sizeof regs[0]), out, outsz);
+}
+
+size_t bvm_scope_dump_cmd(const bvm_logic_cfg_t *c, uint32_t write_addr,
+                          int dump_chan, int nch, char *out, size_t outsz){
+    uint32_t start=(write_addr - c->nsamples) % BVM_BUFFER_BYTES;
+    uint16_t asamples=(uint16_t)(c->nsamples/(nch>0?nch:1));
+    bvm_reg_t regs[] = {
+        { R_SampleAddress,3, start },
+        { R_DumpMode,     1, DUMP_RAW },
+        { R_DumpChan,     1, (uint32_t)dump_chan },  /* 0=A, 1=B */
+        { R_DumpCount,    2, asamples },
+        { R_DumpRepeat,   2, 1 },
+        { R_DumpSend,     2, 1 },
+        { R_DumpSkip,     2, 0 },
+    };
+    return bvm_build_set_registers(regs, (int)(sizeof regs/sizeof regs[0]), out, outsz);
+}
+
 /* ---- wire framing ---------------------------------------------------- */
 int bvm_pack_columns(const uint8_t *samples, int nsamp, uint8_t *col, int ncols){
     if(ncols>256) ncols=256;
@@ -133,6 +198,29 @@ void bvm_emit_frame(const uint8_t *col, int ncols, int nch, uint32_t rate,
     }
     /* end */
     { const char *s="la end"; char *p=line; while(*s)*p++=*s++; *p=0; emit(line,ctx); }
+}
+
+/* Emit one scope frame: "sc begin <ncols> <nch> <rate>", then per channel
+ * "sc d <ch> <off> <hex>" (<=56 samples/line), then "sc end". */
+void sc_emit_frame(const uint8_t *colA, const uint8_t *colB, int ncols, int nch,
+                   uint32_t rate, bvm_line_fn emit, void *ctx){
+    char line[128];
+    { char *p=line; const char *s="sc begin "; while(*s)*p++=*s++;
+      utoa10((uint32_t)ncols,p); *p++=' '; utoa10((uint32_t)nch,p); *p++=' ';
+      utoa10(rate,p); *p=0; emit(line,ctx); }
+    const int PER=56;
+    for(int ch=0; ch<nch; ch++){
+        const uint8_t *src=(ch==0)?colA:colB;
+        for(int off=0; off<ncols; off+=PER){
+            int cnt=(ncols-off<PER)?(ncols-off):PER;
+            char *p=line; const char *s="sc d "; while(*s)*p++=*s++;
+            utoa10((uint32_t)ch,p); *p++=' ';
+            utoa10((uint32_t)off,p); *p++=' ';
+            for(int i=0;i<cnt;i++) put2(p, src[off+i]);
+            *p=0; emit(line,ctx);
+        }
+    }
+    { const char *s="sc end"; char *p=line; while(*s)*p++=*s++; *p=0; emit(line,ctx); }
 }
 
 /* Unmap the internal clock from L5 and stop the clock generator (scopething

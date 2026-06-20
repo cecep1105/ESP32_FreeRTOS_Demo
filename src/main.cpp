@@ -76,8 +76,8 @@ static EspUsbVcp vcp;
 
 // RemoteXY GUI configuration
 #pragma pack(push, 1)  
-uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 677 bytes V19 
-  { 255,227,0,0,0,158,2,19,0,0,0,0,31,1,106,200,3,1,0,0,
+uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 692 bytes V19 
+  { 255,228,0,0,0,173,2,19,0,0,0,0,31,1,106,200,3,1,0,0,
   19,0,130,4,139,98,36,13,163,130,3,3,100,53,11,107,130,3,62,100,
   71,11,107,2,31,19,53,16,0,2,26,31,31,82,85,78,0,83,84,79,
   80,0,2,12,85,16,16,1,2,26,31,31,49,0,79,70,70,0,2,36,
@@ -92,25 +92,26 @@ uint8_t const PROGMEM RemoteXY_CONF_PROGMEM[] =   // 677 bytes V19
   2,31,78,101,120,116,0,6,129,32,145,47,12,64,35,81,82,67,79,68,
   69,0,2,8,157,42,11,0,2,26,31,31,83,72,79,87,0,72,73,68,
   69,0,2,60,157,36,10,0,2,26,31,31,66,73,71,0,83,77,65,76,
-  76,0,10,0,130,3,67,100,49,11,17,130,2,8,102,52,11,17,7,7,
-  21,93,12,100,0,2,26,2,201,1,20,41,61,10,1,2,31,83,69,78,
-  68,32,84,69,88,84,0,7,7,82,43,10,118,64,2,26,2,7,57,82,
-  42,10,118,64,2,26,2,1,16,99,74,10,1,2,31,83,69,84,32,84,
-  73,77,69,0,129,21,70,62,8,64,6,77,97,110,117,97,108,32,67,108,
-  111,99,107,32,83,101,116,0,131,3,178,37,12,1,6,2,31,80,82,69,
-  86,0,41,131,66,178,37,12,1,6,2,31,78,69,88,84,0,26,17,0,
-  130,8,7,89,32,11,17,129,23,13,59,9,64,35,76,111,103,105,99,32,
-  65,110,97,108,121,122,101,114,0,2,30,23,43,12,0,2,26,31,31,79,
-  78,0,79,70,70,0,130,8,42,89,29,11,17,129,26,45,52,9,64,35,
-  79,115,99,105,108,108,111,115,99,111,112,101,0,2,30,55,43,12,0,2,
-  26,31,31,79,78,0,79,70,70,0,130,9,80,87,39,11,105,2,15,93,
-  29,13,0,2,26,31,31,79,78,0,79,70,70,0,4,13,108,77,7,128,
-  2,26,2,64,93,26,13,0,2,26,31,31,82,0,76,0,129,28,84,48,
-  7,64,1,83,69,82,86,79,32,77,79,84,79,82,0,130,9,122,87,43,
-  11,107,2,14,134,26,13,0,2,26,31,31,79,78,0,79,70,70,0,4,
-  15,150,78,9,128,2,26,2,64,134,26,12,0,2,26,31,31,82,0,76,
-  0,129,20,125,64,8,64,1,83,84,69,80,80,69,82,32,77,79,84,79,
-  82,0,131,34,180,37,12,1,6,2,31,80,82,69,86,0,38 };
+  76,0,15,0,130,4,123,97,42,11,105,130,3,67,100,49,11,17,130,2,
+  8,102,52,11,17,7,7,21,93,12,100,0,2,26,2,201,1,20,41,61,
+  10,1,2,31,83,69,78,68,32,84,69,88,84,0,7,7,82,43,10,118,
+  64,2,26,2,7,57,82,42,10,118,64,2,26,2,1,16,99,74,10,1,
+  2,31,83,69,84,32,84,73,77,69,0,129,21,70,62,8,64,6,77,97,
+  110,117,97,108,32,67,108,111,99,107,32,83,101,116,0,131,3,178,37,12,
+  1,6,2,31,80,82,69,86,0,41,131,66,178,37,12,1,6,2,31,78,
+  69,88,84,0,26,2,14,139,29,13,0,2,26,31,31,79,78,0,79,70,
+  70,0,4,16,155,77,7,128,2,26,2,68,139,26,12,0,2,26,31,31,
+  82,0,76,0,129,27,126,55,8,64,1,83,69,82,86,79,32,77,79,84,
+  79,82,0,13,0,130,5,7,98,32,11,17,129,23,13,59,9,64,35,76,
+  111,103,105,99,32,65,110,97,108,121,122,101,114,0,2,30,23,43,12,0,
+  2,26,31,31,79,78,0,79,70,70,0,130,4,42,99,57,11,17,129,26,
+  45,52,9,64,35,79,115,99,105,108,108,111,115,99,111,112,101,0,2,30,
+  55,43,12,0,2,26,31,31,79,78,0,79,70,70,0,130,9,108,87,43,
+  11,107,2,14,120,26,13,0,2,26,31,31,79,78,0,79,70,70,0,4,
+  15,136,78,9,128,2,26,2,64,120,26,12,0,2,26,31,31,82,0,76,
+  0,129,20,111,64,8,64,1,83,84,69,80,80,69,82,32,77,79,84,79,
+  82,0,131,34,180,37,12,1,6,2,31,80,82,69,86,0,38,12,20,78,
+  72,9,193,30,26,65,66,0,65,0,66,0 };
   
 // this structure defines all the variables and events of your control interface 
 struct {
@@ -133,14 +134,15 @@ struct {
   int16_t hourval; // -32768 .. +32767
   int16_t minval; // -32768 .. +32767
   uint8_t settime; // =1 if button pressed, else =0, from 0 to 1
-  uint8_t laSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
-  uint8_t scSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
   uint8_t servoSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
   int8_t servoSpeed; // from 0 to 100
   uint8_t servoDir; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t laSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t scSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
   uint8_t stepSwitch; // =1 if switch ON and =0 if OFF, from 0 to 1
   int8_t stepSpeed; // from 0 to 100
   uint8_t stepDir; // =1 if switch ON and =0 if OFF, from 0 to 1
+  uint8_t scChan; // from 0 to 3
 
     // other variable
   uint8_t connect_flag;  // =1 if wire connected, else =0
@@ -254,6 +256,87 @@ static void fetchPrayerTimes(void) {
             piCmd("prayer %d %s %02d:%02d", i, names[i], mins[i] / 60, mins[i] % 60);
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Single command dispatcher. The RemoteXY "Message" button AND the laSwitch/
+ * scSwitch shortcuts all call this, so flipping a switch behaves exactly like
+ * typing the command into the message box. Mode entries send the OTHER view's
+ * "off" to the Pi and stop the other ESP-side source, so logic<->scope swaps
+ * are clean and only one source ever streams.
+ * ------------------------------------------------------------------------- */
+void handleTextCmd(const char *text) {
+    char buf[101];
+    strncpy(buf, text, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    for (char *p = buf; *p; ++p)                      // strip stray CR/LF
+        if (*p == '\r' || *p == '\n') *p = ' ';
+    if (!buf[0]) return;
+ 
+    char cmd[10] = {0}; int ci = 0;
+    while (buf[ci] && buf[ci] != ' ' && buf[ci] != ':' && ci < 9) {
+        cmd[ci] = (char)tolower((unsigned char)buf[ci]); ci++;
+    }
+    const char *rest = buf[ci] ? buf + ci + 1 : buf + ci;   // skip the separator
+ 
+    if (!strcmp(cmd,"qr") || !strcmp(cmd,"qrfull") || !strcmp(cmd,"qrsmall")) {
+        char qcmd[120];
+        snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
+        piSendRaw(qcmd);
+        Serial.printf("[TX-QR] %s\n", qcmd);
+
+
+
+    } else if (!strcmp(cmd,"la")) {                       // logic-analyzer view
+        if (!strncmp(rest,"off",3)) {
+            bs05_stop(); g_laRun = false; piSendRaw("la off");
+            Serial.println("[LA] off");
+        } else if (!strncmp(rest,"sim",3)) {
+            bs05_stop(); g_laRun = true;                          // synthetic source
+            Serial.println("[LA] sim");
+        } else {
+            g_laRun = false; bs05_start();                        // real BS05U capture
+            Serial.println("[LA] on");
+        }
+ 
+    } else if (!strcmp(cmd,"scope")) {                   // oscilloscope view (CHA/CHB)
+        if (!strncmp(rest,"off",3)) {
+            bs05_stop(); piSendRaw("sc off");
+            Serial.println("[SCOPE] off");
+        } else {
+            bool sim = !strncmp(rest,"sim",3);           // "scope sim" = synthetic
+            const char *chsel = rest;
+            if      (sim)                       chsel += 3;
+            else if (!strncmp(rest,"hw",2))     chsel += 2;  // accept optional "hw"
+            while (*chsel == ' ') chsel++;
+            uint8_t mask = 0x03;                          // default both
+            if      (chsel[0]=='a' && chsel[1]!='b') mask = 0x01;
+            else if (chsel[0]=='b')                  mask = 0x02;
+            g_laRun = false;
+            if (sim) bs05_scope(mask); else bs05_scope_hw(mask);  // real by default
+            Serial.printf("[SCOPE] %s mask=0x%02x\n", sim ? "sim" : "hw", mask);
+        }
+
+
+
+
+
+
+ 
+    } else if (!strcmp(cmd,"wifi")) {
+        g_wifiReconfig = true;
+        Serial.println("[WIFI] reconfigure requested");
+ 
+    } else {                                             // plain text -> marquee
+        for (int i = 0; i < (int)sizeof(buf) && buf[i] != '\0'; i++)
+            buf[i] = (char)toupper((unsigned char)buf[i]);
+        piCmd("msg %s", buf);
+        Serial.printf("[TX] %s\n", buf);
+    }
+}
+
+
+
+
 /* ============================ TASK 1: RemoteXY ===========================
  * Owns the RemoteXY struct; turns GUI controls into text commands. Sends only
  * on change (the UART link is reliable, so no heartbeat resend needed).
@@ -306,18 +389,6 @@ void remotexyTask(void *pv) {
         if (RemoteXY.led8) mask |= (1 << 7);
         if ((int)mask != lastMask) { piCmd("leds %d", mask); lastMask = mask; }
 
-
-        // show logic analyzer on|off
-        uint8_t laSwitch = RemoteXY.laSwitch ? 1 : 0;
-        if (laSwitch != lastLa) { 
-           strcpy(RemoteXY.msgText, laSwitch? "la" : "la off"); 
-           RemoteXY.buttonMsg = 1; // cheat: reuse the message box to trigger the capture on the Pi
-        }
-
-        // show scope on|off
-        uint8_t scSwitch = RemoteXY.scSwitch ? 1 : 0;
-        if (scSwitch != lastSc) { piCmd(scSwitch ? "scope" : "scope off"); lastSc = scSwitch; }
-
         
         // set clock on the rising edge of the Set-time button
         if (RemoteXY.settime && !lastSet) {
@@ -330,51 +401,31 @@ void remotexyTask(void *pv) {
     // --- custom message button (fires once per press) ---
     static uint8_t lastSendBtn = 0;
     if (RemoteXY.buttonMsg && !lastSendBtn) {
-        char buf[101];
-        strncpy(buf, RemoteXY.msgText, sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';                 // hard 100-char clamp + null
-        for (char *p = buf; *p; ++p)                 // strip stray CR/LF from keyboard
-            if (*p == '\r' || *p == '\n') *p = ' ';
-        if (buf[0]) {
-            // Detect a qr-family control command at the start of the message:
-            //   "qr ...", "QR:...", "qrfull ...", "qrsmall ..."  (case-insensitive)
-            // Forward those to the Pi verbatim; everything else is a marquee msg.
-            // Examples:  "QR:https://site" -> "qr https://site"
-            //            "qrsmall HELLO"   -> "qrsmall HELLO"
-            //            "qrfull off"      -> "qrfull off"
-            char cmd[10] = {0}; int ci = 0;
-            while (buf[ci] && buf[ci] != ' ' && buf[ci] != ':' && ci < 9) {
-                cmd[ci] = (char)tolower((unsigned char)buf[ci]); ci++;
-            }
-            const char *rest = buf[ci] ? buf + ci + 1 : buf + ci;   // skip the separator
-            if (!strcmp(cmd,"qr") || !strcmp(cmd,"qrfull") || !strcmp(cmd,"qrsmall")) {
-                char qcmd[120];
-                snprintf(qcmd, sizeof qcmd, "%s %s", cmd, rest);
-                piSendRaw(qcmd);
-                Serial.printf("[TX-QR] %s\n", qcmd);
-            } else if (!strcmp(cmd,"la")) {
-                if (!strncmp(rest,"sim",3)) {          // "la sim"  -> synthetic pattern (no device)
-                    bs05_stop(); g_laRun = true;  Serial.println("[LA] sim on");
-                } else if (!strncmp(rest,"off",3)) {   // "la off"  -> stop both
-                    g_laRun = false; bs05_stop(); piSendRaw("la off"); Serial.println("[LA] off");
-                } else {                               // "la"      -> real BS05U capture
-                    g_laRun = false; bs05_start(); Serial.println("[LA] capture on");
-                }
-            } else if (!strcmp(cmd,"wifi")) {
-                // reopen the WiFiManager portal so you can pick a new hotspot
-                g_wifiReconfig = true;
-                Serial.println("[WIFI] reconfigure requested");
-            } else {
-                for (int i = 0; i < sizeof(buf) && buf[i] != '\0'; i++) buf[i] = toupper(buf[i]);
-                piCmd("msg %s", buf);              // text as ARGUMENT, not as format
-                Serial.printf("[TX] %s\n", buf);
-            }
-        }
+        handleTextCmd(RemoteXY.msgText);     // same path as the switches
     }
     lastSendBtn = RemoteXY.buttonMsg;
 
 
-
+    // --- laSwitch / scSwitch: a flip == typing the command via the message box ---
+    // Editor: add two Switch widgets named laSwitch and scSwitch (regenerates the
+    // RemoteXY struct). They are mutually exclusive — turning one on clears the
+    // other in the app so the GUI mirrors the single active view; handleTextCmd
+    // also sends the other view's "off" to the Pi.
+    static uint8_t lsLaSw = 0, lsScSw = 0;
+    uint8_t laSw = RemoteXY.laSwitch ? 1 : 0;
+    if (laSw != lsLaSw) {
+        if (laSw && RemoteXY.scSwitch) { RemoteXY.scSwitch = 0; lsScSw = 0; }
+        handleTextCmd(laSw ? "la" : "la off");
+        lsLaSw = laSw;
+    }
+    uint8_t scSw = RemoteXY.scSwitch ? 1 : 0;
+    if (scSw != lsScSw) {
+        if (scSw && RemoteXY.laSwitch) { RemoteXY.laSwitch = 0; lsLaSw = 0; }
+        const char *v = (RemoteXY.scChan==1) ? "scope a" : (RemoteXY.scChan==2) ? "scope b" : "scope";
+        handleTextCmd(scSw ? v : "scope off");
+        lsScSw = scSw;
+    }
+ 
 
 
 

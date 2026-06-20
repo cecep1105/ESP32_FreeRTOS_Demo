@@ -29,9 +29,13 @@ enum {
     R_DumpMode     = 0x1e, R_DumpChan    = 0x30, R_DumpSend     = 0x18,
     R_DumpSkip     = 0x1a, R_DumpCount   = 0x1c, R_DumpRepeat   = 0x16,
     R_AnalogEnable = 0x37, R_DigitalEnable= 0x38,
+    R_ConverterLo  = 0x64, R_ConverterHi = 0x66, R_TriggerLevel = 0x68,
+    R_KitchenSinkA = 0x7b, R_KitchenSinkB= 0x7c,
     R_Cmd          = 0x46, R_Mode         = 0x47, R_Map5 = 0x99
 };
 enum { TRACE_LOGIC = 14, BUFMODE_SINGLE = 0, DUMP_RAW = 0 };
+enum { TRACE_ANALOG = 0, TRACE_ANALOGCHOP = 2, BUFMODE_CHOP = 1,
+       KSB_ANALOG_FILTER = 0x80 };
 enum { TS_DONE = 0, TS_AUTO = 1, TS_WAIT = 2, TS_STOP = 3 };
 
 #define BVM_PRIMARY_CLOCK 40000000UL
@@ -56,6 +60,19 @@ typedef struct {
 
 /* Resolve ticks/intro/outro for a free-running logic grab. */
 void bvm_logic_plan(uint32_t target_rate, uint16_t nsamples, bvm_logic_cfg_t *c);
+
+/* ---- analog (oscilloscope) capture builders ------------------------------
+ * Free-running CHA/CHB grab. nch=1 single buffer (TRACE_ANALOG), nch=2 chop
+ * buffer (TRACE_ANALOGCHOP); in chop mode each channel is dumped separately by
+ * DumpChan (0=A,1=B), so no manual de-interleave. ConverterLo/Hi are the raw
+ * U0.16 ADC window and WILL need per-device tuning (uncalibrated by default). */
+void   bvm_scope_plan(uint32_t target_rate, uint16_t nsamples, int nch,
+                      bvm_logic_cfg_t *c);
+size_t bvm_scope_setup_cmd(const bvm_logic_cfg_t *c, uint8_t analog_mask, int nch,
+                           uint16_t conv_lo, uint16_t conv_hi,
+                           char *out, size_t outsz);
+size_t bvm_scope_dump_cmd (const bvm_logic_cfg_t *c, uint32_t write_addr,
+                           int dump_chan, int nch, char *out, size_t outsz);
 
 /* Emit the register block for a logic capture (call ' >','U','D' after). */
 size_t bvm_logic_setup_cmd(const bvm_logic_cfg_t *c, uint8_t digital_enable,
@@ -83,5 +100,10 @@ int bvm_pack_columns(const uint8_t *samples, int nsamp, uint8_t *col, int ncols)
 typedef void (*bvm_line_fn)(const char *line, void *ctx);
 void bvm_emit_frame(const uint8_t *col, int ncols, int nch, uint32_t rate,
                     bvm_line_fn emit, void *ctx);
+
+/* Emit one oscilloscope frame as "sc begin/d <ch> <off>/end" wire lines.
+ * colA/colB are 8-bit sample columns (colB ignored when nch==1). */
+void sc_emit_frame(const uint8_t *colA, const uint8_t *colB, int ncols, int nch,
+                   uint32_t rate, bvm_line_fn emit, void *ctx);
 
 #endif

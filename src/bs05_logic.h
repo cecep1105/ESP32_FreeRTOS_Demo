@@ -22,6 +22,10 @@
 #define BS_RATE_HZ  4000000     /* target logic sample rate (40MHz/ticks)     */
 #define BS_FPS      4           /* live-view frames per second (2..5)         */
 #define BS_DIGITAL  0xFF        /* enabled logic channels bitmap (L0..L7)     */
+#define BS_SC_NCOLS   240       /* scope display columns sent to the Pi       */
+#define BS_SC_RATE_HZ 8000000   /* scope target sample rate (display only)    */
+#define BS_SC_CONV_LO 0x0000    /* [HW] U0.16 ADC window bottom — TUNE on hw  */
+#define BS_SC_CONV_HI 0xFFFF    /* [HW] U0.16 ADC window top    — TUNE on hw  */
 
 /* Minimal USB-host VCP interface — bind to your chosen library (see .cpp). */
 class IVcp {
@@ -36,8 +40,10 @@ public:
 };
 
 void bs05_begin(IVcp *vcp);   /* register the VCP backend + reset device */
-void bs05_start(void);        /* begin free-running capture/stream       */
-void bs05_stop(void);         /* stop; Pi should also get "la off"       */
+void bs05_start(void);        /* begin free-running LOGIC capture/stream */
+void bs05_scope(uint8_t chmask); /* SCOPE mode (SIM source): bit0=A, bit1=B    */
+void bs05_scope_hw(uint8_t chmask); /* SCOPE mode (REAL analog BVM capture)    */
+void bs05_stop(void);         /* stop; Pi should also get "la off"/"sc off" */
 bool bs05_running(void);
 
 /* The FreeRTOS task body (create with xTaskCreate in setup()). It owns the
