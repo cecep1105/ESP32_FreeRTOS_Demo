@@ -614,37 +614,48 @@ static void forwardMarquee(const char *text) {
     Serial.printf("[WS->PI] msg %s\n", buf);
 }
 
-// Turn an incoming WS text frame into a marquee string. Accepts either plain
-// text (forwarded as-is) or a JSON object. For JSON it uses an explicit
-// message/msg/text field if present; otherwise it composes a netwatch-style
-// line from name/host/address + status/state + comment.
+// Turn an incoming WS text frame into a marquee update. We act ONLY on the
+// "netupdate" section; any other section is ignored. The nested "message"
+// object {host,status,since} becomes a gated netwatch overlay sent as "netmsg"
+// (case preserved, GPIO21-gated on the Pi). An empty/absent message sends a
+// bare "netmsg" so the Pi falls back to the usual base marquee.
 static void handleWsText(uint8_t *payload, size_t length) {
     static char in[512];
     size_t m = (length < sizeof(in) - 1) ? length : sizeof(in) - 1;
     memcpy(in, payload, m); in[m] = '\0';
 
-    if (in[0] != '{') { forwardMarquee(in); return; }      // not JSON -> raw
+    if (in[0] != '{') { forwardMarquee(in); return; }      // plain text -> marquee
 
     JsonDocument doc;
     if (deserializeJson(doc, in)) { forwardMarquee(in); return; }  // bad JSON -> raw
 
-    const char *msg = doc["message"] | (const char *)nullptr;
-    if (!(msg && *msg)) msg = doc["msg"]  | (const char *)nullptr;
-    if (!(msg && *msg)) msg = doc["text"] | (const char *)nullptr;
-    if (msg && *msg) { forwardMarquee(msg); return; }
+    const char *section = doc["section"] | "";
+    if (strcmp(section, "netupdate") != 0) return;         // ignore other sections
 
-    const char *host    = doc["host"]    | "";
-    const char *addr    = doc["address"] | "";
-    const char *name    = doc["name"]    | "";
-    const char *status  = doc["status"]  | "";
-    const char *state   = doc["state"]   | "";
-    const char *comment = doc["comment"] | "";
-    const char *who = name[0] ? name : (host[0] ? host : addr);
-    const char *st  = status[0] ? status : state;
+    const char *host   = doc["message"]["host"]   | "";
+    const char *status = doc["message"]["status"] | "";
+    const char *since  = doc["message"]["since"]  | "";
+
+    if (!host[0] && !status[0] && !since[0]) {              // empty -> show usual
+        piCmd("netmsg");                                   // Pi reverts to g_base_msg
+        Serial.println("[WS->PI] netmsg (empty) -> base");
+        return;
+    }
 
     char line[MARQUEE_MAX + 1];
-    snprintf(line, sizeof line, "NETWATCH %s %s %s", who, st, comment);
-    forwardMarquee(line);
+    snprintf(line, sizeof line, "Host %s status %s since %s", host, status, since);
+
+    char buf[MARQUEE_MAX + 1];                              // strip control chars
+    int n = 0;
+    for (const char *s = line; *s && n < MARQUEE_MAX; ++s) {
+        char c = *s;
+        if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+        if ((unsigned char)c < 0x20) continue;
+        buf[n++] = c;
+    }
+    buf[n] = '\0';
+    piCmd("netmsg %s", buf);                                // gated WS overlay
+    Serial.printf("[WS->PI] netmsg %s\n", buf);
 }
 
 static void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
