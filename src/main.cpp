@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
+#include <math.h>                             // powf() for the timebase-knob rate map
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
 
@@ -28,9 +29,16 @@
 #include "bvm.h"          // protocol helpers (pack + wire framing)
 #include "bs05_logic.h"   // BS_* tunables (+ real capture, added later)
 #include "la_sim.h"       // synthetic source: prove HDMI path without the BS05U
+#include "siggen.h"       // A0..A3 test-signal generator (square / PWM-sine)
 
 #include "esp_usb_vcp.h"
 static EspUsbVcp vcp;
+
+/* Live capture rates — defined in bs05_logic.cpp and driven by the RemoteXY
+ * timebase knobs. Declared here too so this translation unit compiles even if
+ * bs05_logic.h on disk predates the timebase feature. */
+extern volatile uint32_t g_la_rate_hz;
+extern volatile uint32_t g_sc_rate_hz;
 
 
 
@@ -224,7 +232,7 @@ static void laSimTask(void *pv) {
         if (!g_laRun) { vTaskDelay(pdMS_TO_TICKS(80)); continue; }
         la_sim_fill(samples, BS_NSAMPLES, frame++);
         int nc = bvm_pack_columns(samples, BS_NSAMPLES, col, BS_NCOLS);
-        bvm_emit_frame(col, nc, 8, BS_RATE_HZ, laEmit, nullptr);
+        bvm_emit_frame(col, nc, 8, g_la_rate_hz, laEmit, nullptr);
         vTaskDelay(period);
     }
 }
@@ -336,6 +344,27 @@ void handleTextCmd(const char *text) {
 
 
  
+    } else if (!strcmp(cmd,"sig")) {                     // A0..A3 test-signal generator
+        if (!strncmp(rest,"off",3)) {                    // "sig off" -> all channels off
+            siggen_off(-1);
+            Serial.println("[SIG] all off");
+        } else {
+            int idx = -1; char mode[8] = {0}; unsigned long f = 0;
+            int got = sscanf(rest, "%d %7s %lu", &idx, mode, &f);
+            if (got >= 2 && !strcmp(mode,"off")) {
+                siggen_off(idx);
+                Serial.printf("[SIG] A%d off\n", idx);
+            } else if (got >= 3 && (!strcmp(mode,"sq") || !strcmp(mode,"square"))) {
+                bool ok = siggen_square(idx, (uint32_t)f);
+                Serial.printf("[SIG] A%d square %lu Hz%s\n", idx, f, ok?"":" (bad args)");
+            } else if (got >= 3 && (!strcmp(mode,"sine") || !strcmp(mode,"sin"))) {
+                bool ok = siggen_sine(idx, (uint32_t)f);
+                Serial.printf("[SIG] A%d sine %lu Hz (needs RC LPF)%s\n", idx, f, ok?"":" (bad args)");
+            } else {
+                Serial.println("[SIG] usage: sig <0-3> sq|sine <freq> | sig <0-3> off | sig off");
+            }
+        }
+
     } else if (!strcmp(cmd,"wifi")) {
         g_wifiReconfig = true;
         Serial.println("[WIFI] reconfigure requested");
@@ -365,6 +394,15 @@ void handleTextCmd(const char *text) {
  *   Switch  stepDir       -> stepper CW / CCW
  * (The editor regenerates RemoteXY_CONF and the RemoteXY struct to match.)   */
 #define USE_SERVO_STEPPER_GUI 1
+
+/* Map a RemoteXY knob (0..100) to a sample rate with a geometric sweep, so each
+ * step is an equal *ratio* (the natural feel for a timebase). knob 0 = slowest
+ * (most time/div, zoomed out); knob 100 = fastest (least time/div, zoomed in).  */
+static uint32_t knob_rate(int knob, uint32_t rmin, uint32_t rmax) {
+    if (knob < 0)   knob = 0;
+    if (knob > 100) knob = 100;
+    return (uint32_t)(rmin * powf((float)rmax / (float)rmin, knob / 100.0f));
+}
 
 void remotexyTask(void *pv) {
     uint8_t lastRun  = 0xFF;
@@ -404,11 +442,21 @@ void remotexyTask(void *pv) {
         if ((int)mask != lastMask) { piCmd("leds %d", mask); lastMask = mask; }
 
         
-        // set clock on the rising edge of the Set-time button
+        // set the Pi clock on the rising edge of the Set-time button.
+        // Prefer the phone's real time (realTime_01); fall back to the manual
+        // hour/min sliders if the app hasn't synced a timestamp yet.
         if (RemoteXY.settime && !lastSet) {
-            int hh = RemoteXY.hourval; if (hh < 0) hh = 0; if (hh > 23) hh = 23;
-            int mm = RemoteXY.minval;  if (mm < 0) mm = 0; if (mm > 59) mm = 59;
-            piCmd("set %s", hh, mm);
+            int64_t ts = RemoteXY.realTime_01.getAppTimeStamp();   // ms; 0 until synced
+            if (ts != 0) {
+                RemoteXYTime t = RemoteXY.realTime_01.getAppTime(); // phone local time
+                piCmd("set %02d:%02d:%02d", t.hour, t.minute, t.second);
+                Serial.printf("[CLK] phone %02d:%02d:%02d\n", t.hour, t.minute, t.second);
+            } else {
+                int hh = RemoteXY.hourval; if (hh < 0) hh = 0; if (hh > 23) hh = 23;
+                int mm = RemoteXY.minval;  if (mm < 0) mm = 0; if (mm > 59) mm = 59;
+                piCmd("set %02d:%02d:00", hh, mm);
+                Serial.printf("[CLK] manual %02d:%02d\n", hh, mm);
+            }
         }
         lastSet = RemoteXY.settime;
 
@@ -439,8 +487,44 @@ void remotexyTask(void *pv) {
         handleTextCmd(scSw ? v : "scope off");
         lsScSw = scSw;
     }
- 
 
+    // --- laTimebase / scTimebase knobs: change the live capture rate ----------
+    // The new rate re-plans the BitScope clock on the next frame and is sent to
+    // the Pi in the `begin` line. Baselines start at 0 (the RemoteXY default) so
+    // the boot-time knob position does NOT force the rate off its good default
+    // (g_la_rate_hz=4MHz / g_sc_rate_hz=8MHz) — the rate only changes once you
+    // actually move a knob. Tune the min/max ends to your probe needs.
+    static int lastLaTb = 0, lastScTb = 0;
+    if (RemoteXY.laTimebase != lastLaTb) {
+        g_la_rate_hz = knob_rate(RemoteXY.laTimebase, 250000UL, 40000000UL);  // 250kHz..40MHz
+        lastLaTb = RemoteXY.laTimebase;
+        Serial.printf("[LA] rate=%lu Hz\n", (unsigned long)g_la_rate_hz);
+    }
+    if (RemoteXY.scTimebase != lastScTb) {
+        g_sc_rate_hz = knob_rate(RemoteXY.scTimebase, 50000UL, 20000000UL);   // 50kHz..20MHz
+        lastScTb = RemoteXY.scTimebase;
+        Serial.printf("[SC] rate=%lu Hz\n", (unsigned long)g_sc_rate_hz);
+    }
+
+    // --- qr_switch / qrmode: show/hide a QR built from msgText ----------------
+    // qrmode 1 = full-screen (qrfull), 0 = small band (qrsmall). msgText is the
+    // payload — set it, then flip qr_switch. Re-issues if you change mode while on.
+    static uint8_t lsQr = 0, lsQrMode = 0xFF;
+    uint8_t qrSw = RemoteXY.qr_switch ? 1 : 0;
+    if (qrSw != lsQr || (qrSw && RemoteXY.qrmode != lsQrMode)) {
+        if (qrSw) {
+            char q[180];
+            snprintf(q, sizeof q, "%s %s",
+                     RemoteXY.qrmode ? "qrfull" : "qrsmall", RemoteXY.msgText);
+            piSendRaw(q);
+            Serial.printf("[QR] %s\n", q);
+        } else {
+            piSendRaw("qr off");
+            Serial.println("[QR] off");
+        }
+        lsQr = qrSw;
+        lsQrMode = RemoteXY.qrmode;
+    }
 
 
 
@@ -573,6 +657,8 @@ static void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
             Serial.println("[WS] disconnected");
             break;
         case WStype_TEXT:
+            // full raw text exactly as it arrives (payload is NOT null-terminated)
+            Serial.printf("[WS-RAW %u] %.*s\n", (unsigned)length, (int)length, (const char*)payload);
             handleWsText(payload, length);
             break;
         default:
@@ -612,6 +698,7 @@ void setup() {
     Serial1.begin(PI_BAUD, SERIAL_8N1, PI_RX_PIN, PI_TX_PIN);
 
     bs05_begin(&vcp);                 // starts USB host (manages hot-plug)
+    siggen_begin();                   // A0..A3 test-signal generator ready (all off)
     xTaskCreatePinnedToCore(bs05_task, "bs05", 4096, (void*)piSendRaw, 1, NULL, 1);
 
 

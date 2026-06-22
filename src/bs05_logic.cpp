@@ -17,6 +17,11 @@
 static IVcp        *g_vcp = nullptr;
 static volatile bool g_run = false;
 
+/* Live capture rates, driven by the RemoteXY timebase knobs (see bs05_logic.h).
+ * Default to the compile-time constants; remotexyTask overwrites them.        */
+volatile uint32_t g_la_rate_hz = BS_RATE_HZ;
+volatile uint32_t g_sc_rate_hz = BS_SC_RATE_HZ;
+
 /* Capture mode. LOGIC = real BVM logic grab (hardware-proven). SCOPE = CHA/CHB
  * traces; the source below is a synthetic generator so the command path, wire
  * format and Pi scope renderer can be brought up on hardware now — the real
@@ -225,6 +230,10 @@ static bool bs05_scope_capture(uint8_t *colA, uint8_t *colB, int nch,
      * echo (uppercase) is skipped by the reader. */
     long code = TS_WAIT; uint32_t pollstart = millis(); bool cancelled = false;
     while((millis() - pollstart) < 1500){
+        if(g_mode != BS_MODE_SCOPE || !g_run){   /* user switched away mid-grab */
+            char k='K'; g_vcp->write(&k,1);       /* cancel trace, bail fast      */
+            return false;
+        }
         long c0 = vcp_read_hex_token(100);
         if(c0 >= 0){
             (void)vcp_read_hex_token(100);       /* timestamp */
@@ -317,8 +326,10 @@ void bs05_task(void *pv){
                 /* real analog BVM capture; needs the device + register tuning */
                 if(!conn){ vTaskDelay(pdMS_TO_TICKS(50)); continue; }
                 bvm_logic_cfg_t cfg;
-                bvm_scope_plan(BS_SC_RATE_HZ, (uint16_t)(BS_SC_NCOLS*nch), nch, &cfg);
+                bvm_scope_plan(g_sc_rate_hz, (uint16_t)(BS_SC_NCOLS*nch), nch, &cfg);
                 if(!bs05_scope_capture(scA, scB, nch, g_scmask, &cfg)){
+                    /* a mode switch / stop aborts the grab — re-check now, quietly */
+                    if(g_mode != BS_MODE_SCOPE || !g_run) continue;
                     static uint32_t fcnt = 0;
                     if((fcnt++ % 4) == 0)
                         Serial.println("[scope] hw capture failed (tune ConverterLo/Hi, check probes)");
@@ -336,24 +347,16 @@ void bs05_task(void *pv){
                 }
                 scphase++;
             }
-            sc_emit_frame(scA, scB, BS_SC_NCOLS, nch, BS_SC_RATE_HZ,
+            sc_emit_frame(scA, scB, BS_SC_NCOLS, nch, g_sc_rate_hz,
                           emit_adapter, nullptr);
             vTaskDelay(period);
             continue;
         }
 
         bvm_logic_cfg_t cfg;
-        bvm_logic_plan(BS_RATE_HZ, BS_NSAMPLES, &cfg);
+        bvm_logic_plan(g_la_rate_hz, BS_NSAMPLES, &cfg);
 
         if(bs05_capture(samples, &cfg)){
-            /* TEMP: confirm the dump is now real logic (constant bytes when
-             * idle), not echoed command text. Remove once verified. */
-            static uint32_t dbgn = 0;
-            if((dbgn++ % 8) == 0){
-                Serial.printf("[bs05] raw:");
-                for(int i = 0; i < 16; i++) Serial.printf(" %02x", samples[i]);
-                Serial.println();
-            }
             int nc = bvm_pack_columns(samples, cfg.nsamples, col, BS_NCOLS);
             bvm_emit_frame(col, nc, 8, cfg.actual_rate, emit_adapter, nullptr);
         }
