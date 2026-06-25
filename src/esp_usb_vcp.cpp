@@ -82,7 +82,7 @@ static void connect_task(void *arg){
         try {
             dev = new FT23x(FT232_PID, &cfg, 0);        // throws on failure -> real error
         } catch (esp_err_t e) {
-            ESP_LOGE(TAG, "FT23x open failed: 0x%x (%s)", e, esp_err_to_name(e));
+            // ESP_LOGE(TAG, "FT23x open failed: 0x%x (%s)", e, esp_err_to_name(e));
             dev = nullptr;
         } catch (...) {
             ESP_LOGE(TAG, "FT23x open failed: unknown exception");

@@ -669,7 +669,7 @@ static void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
             break;
         case WStype_TEXT:
             // full raw text exactly as it arrives (payload is NOT null-terminated)
-            Serial.printf("[WS-RAW %u] %.*s\n", (unsigned)length, (int)length, (const char*)payload);
+            // Serial.printf("[WS-RAW %u] %.*s\n", (unsigned)length, (int)length, (const char*)payload);
             handleWsText(payload, length);
             break;
         default:
